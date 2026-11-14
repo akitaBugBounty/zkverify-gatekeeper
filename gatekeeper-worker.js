@@ -68,17 +68,23 @@ function decide(input) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    // Health check
+    const secret = env.AGENT_GAMES_SECRET || "";
+    // Health check. Per the builder field guide, EVERY response must be
+    // signed with x-agent-games-signature over the raw response body —
+    // the platform's signed preflight probe rejects an unsigned reply
+    // with "The endpoint must return signed protocol-v1 JSON."
     if (request.method === "GET") {
-      return new Response(JSON.stringify({ ok: true, agent: "gatekeeper", version: "1" }), {
-        status: 200, headers: { "content-type": "application/json" },
-      });
+      const body = JSON.stringify({ ok: true, agent: "gatekeeper", version: "1" });
+      const headers = { "content-type": "application/json" };
+      if (secret) {
+        headers["x-agent-games-signature"] = "sha256=" + (await hmacSha256(secret, body));
+      }
+      return new Response(body, { status: 200, headers });
     }
     if (request.method !== "POST") {
       return new Response("Method Not Allowed", { status: 405 });
     }
     const raw = await request.text();
-    const secret = env.AGENT_GAMES_SECRET || "";
     // Verify HMAC on the raw body (accept "sha256=<hex>" or raw hex).
     if (secret) {
       const sig = request.headers.get("x-agent-games-signature") || "";
