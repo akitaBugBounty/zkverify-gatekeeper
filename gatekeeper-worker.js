@@ -69,12 +69,13 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const secret = env.AGENT_GAMES_SECRET || "";
-    // Health check. Per the builder field guide, EVERY response must be
-    // signed with x-agent-games-signature over the raw response body —
-    // the platform's signed preflight probe rejects an unsigned reply
-    // with "The endpoint must return signed protocol-v1 JSON."
+    // Health check. The platform's signed preflight probe expects the
+    // endpoint to answer a protocol-v1 handshake: exactly
+    // { ok: true, protocolVersion: "v1" }, signed with the HMAC secret.
+    // (An earlier shape {"ok":true,"agent":"gatekeeper","version":"1"}
+    // was rejected with "The endpoint must return signed protocol-v1 JSON.")
     if (request.method === "GET") {
-      const body = JSON.stringify({ ok: true, agent: "gatekeeper", version: "1" });
+      const body = JSON.stringify({ ok: true, protocolVersion: "v1" });
       const headers = { "content-type": "application/json" };
       if (secret) {
         headers["x-agent-games-signature"] = "sha256=" + (await hmacSha256(secret, body));
@@ -101,6 +102,18 @@ export default {
       return new Response(JSON.stringify({ error: "bad_json" }), {
         status: 400, headers: { "content-type": "application/json" },
       });
+    }
+    // Protocol handshake: the platform's signed preflight probe sends
+    // {"type":"agent-games.preflight.v1", ...} and expects exactly
+    // { ok: true, protocolVersion: "v1" }, signed. Anything else is
+    // rejected with "The endpoint must return signed protocol-v1 JSON."
+    if (typeof task.type === "string" && task.type.startsWith("agent-games.preflight")) {
+      const preBody = JSON.stringify({ ok: true, protocolVersion: "v1" });
+      const preHeaders = { "content-type": "application/json" };
+      if (secret) {
+        preHeaders["x-agent-games-signature"] = "sha256=" + (await hmacSha256(secret, preBody));
+      }
+      return new Response(preBody, { status: 200, headers: preHeaders });
     }
     const result = decide(task.input || {});
     const body = JSON.stringify(result);
