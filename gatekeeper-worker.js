@@ -78,7 +78,7 @@ export default {
       const body = JSON.stringify({ ok: true, protocolVersion: "v1" });
       const headers = { "content-type": "application/json" };
       if (secret) {
-        headers["x-agent-games-signature"] = "sha256=" + (await hmacSha256(secret, body));
+        headers["x-agent-games-signature"] = (await hmacSha256(secret, body));
       }
       return new Response(body, { status: 200, headers });
     }
@@ -111,7 +111,7 @@ export default {
       const preBody = JSON.stringify({ ok: true, protocolVersion: "v1" });
       const preHeaders = { "content-type": "application/json" };
       if (secret) {
-        preHeaders["x-agent-games-signature"] = "sha256=" + (await hmacSha256(secret, preBody));
+        preHeaders["x-agent-games-signature"] = (await hmacSha256(secret, preBody));
       }
       return new Response(preBody, { status: 200, headers: preHeaders });
     }
@@ -119,7 +119,7 @@ export default {
     const body = JSON.stringify(result);
     const headers = { "content-type": "application/json" };
     if (secret) {
-      headers["x-agent-games-signature"] = "sha256=" + (await hmacSha256(secret, body));
+      headers["x-agent-games-signature"] = (await hmacSha256(secret, body));
     }
     return new Response(body, { status: 200, headers });
   },
